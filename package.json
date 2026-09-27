@@ -1,0 +1,27 @@
+{
+  "name": "spiderman-game",
+  "version": "1.0.0",
+  "description": "A 3D Spider-Man web-swinging game built with Three.js in a single HTML file. Features procedural city generation, pendulum swing physics, landmark buildings, multiple suit styles, and dual controls for desktop and mobile.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aryanpol73/spiderman-game.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/aryanpol73/spiderman-game/issues"
+  },
+  "homepage": "https://github.com/aryanpol73/spiderman-game#readme",
+  "devDependencies": {
+    "vite": "^8.3.1"
+  }
+}

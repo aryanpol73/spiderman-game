@@ -1,2 +1,10 @@
-# Ignore large 3D model files (GitHub max file size is 100MB)
+# Node dependencies & build output
+node_modules
+dist
+
+# Large 3D binary assets (GitHub max file size is 100MB)
 *.glb
+
+# OS files
+.DS_Store
+Thumbs.db
