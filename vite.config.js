@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  base: './',
   build: {
-    rollupOptions: {
-      external: [/^three(\/.*)?$/]
-    }
+    outDir: 'dist',
+    chunkSizeWarningLimit: 2000
   }
 });

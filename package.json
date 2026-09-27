@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "cap:sync": "npx cap sync android",
-    "build:apk": "npm run build && npx cap sync android && cd android && .\\gradlew.bat assembleDebug"
+    "build:apk": "npm run build && npx cap sync android && powershell -Command \"$env:JAVA_HOME = 'C:\\Users\\Aryan\\.jdk21\\jdk-21.0.12.1+1'; cd android; .\\gradlew.bat assembleDebug; cd ..; Copy-Item android/app/build/outputs/apk/debug/app-debug.apk Spider-Man-NYC.apk -Force\""
   },
   "repository": {
     "type": "git",
@@ -29,6 +29,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.2",
     "@capacitor/cli": "^8.5.2",
-    "@capacitor/core": "^8.5.2"
+    "@capacitor/core": "^8.5.2",
+    "three": "^0.186.1"
   }
 }
