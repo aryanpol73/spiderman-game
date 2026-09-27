@@ -13,10 +13,11 @@
   }
   #menu {
     position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    background: radial-gradient(ellipse, rgba(110,0,0,.6), rgba(0,0,0,.95));
-    padding: 20px;
+    align-items: center; justify-content: space-between;
+    background: radial-gradient(circle at 50% 50%, rgba(10,5,10,0.18) 0%, rgba(10,5,10,0.65) 60%, rgba(10,5,10,0.92) 100%);
+    padding: 24px 20px 24px; pointer-events: none;
   }
+  #menu > * { pointer-events: auto; }
   #menu h1 {
     margin: 0; font-size: clamp(32px, 6vw, 64px); font-weight: 900;
     font-style: italic; letter-spacing: 4px; text-shadow: 0 0 25px #f00;
@@ -88,11 +89,16 @@
 </head>
 <body>
 <div id="menu">
-  <h1>SPIDER-MAN <span style="color:#e11">NYC</span></h1>
-  <p>CHOOSE YOUR SUIT</p>
+  <div style="text-align:center;">
+    <h1>SPIDER-MAN <span style="color:#e11">NYC</span></h1>
+    <p style="margin:4px 0 0;font-size:12px;opacity:0.8;letter-spacing:3px;">CHOOSE YOUR SUIT</p>
+  </div>
   <div id="suits"></div>
-  <button id="play">PLAY</button>
-  <div id="load"></div>
+  <div style="text-align:center;display:flex;flex-direction:column;align-items:center;">
+    <button id="play">PLAY</button>
+    <div id="load"></div>
+    <div style="font-size:11px;letter-spacing:2px;opacity:0.7;margin-top:6px;">↔ DRAG BACKGROUND TO ROTATE 3D MODEL</div>
+  </div>
 </div>
 
 <div id="hud">
@@ -161,6 +167,8 @@ const SUITS = {
   tobey: {
     name: 'CLASSIC 2002', sub: 'Tobey Maguire era',
     model: 'models/tobey.glb',
+    texture: 'models/raimi_diffuse.png',
+    bumpMap: 'models/raimi_bump.png',
     main: '#8f0b12', sec: '#0e2466', web: '#2a2a2a', eye: 0xbfc9d4, lineW: 4, raised: true
   },
   andrew: {
@@ -174,11 +182,14 @@ const sd = document.getElementById('suits');
 for (const k in SUITS) {
   const s = SUITS[k], d = document.createElement('div');
   d.className = 'suit' + (k === suitKey ? ' sel' : '');
-  d.innerHTML = `<div class="sw" style="background:linear-gradient(135deg,${s.main} 55%,${s.sec} 55%)"></div><b>${s.name}</b><br><small>${s.sub}</small>`;
+  const bg = s.texture ? `url(${s.texture}) center/cover` : `linear-gradient(135deg,${s.main} 55%,${s.sec} 55%)`;
+  d.innerHTML = `<div class="sw" style="background:${bg}"></div><b>${s.name}</b><br><small>${s.sub}</small>`;
   d.onclick = () => {
+    if (suitKey === k) return;
     suitKey = k;
     document.querySelectorAll('.suit').forEach(e => e.classList.remove('sel'));
     d.classList.add('sel');
+    loadHero(SUITS[k]);
   };
   sd.appendChild(d);
 }
@@ -223,6 +234,15 @@ Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, n
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.05;
 scene.add(sun, sun.target);
+
+// Showcase studio lights for 3D hero inspection in menu
+const showcaseLight = new THREE.DirectionalLight(0xfff2e0, 2.5);
+showcaseLight.position.set(2, 2.8, 153.5);
+scene.add(showcaseLight);
+
+const showcaseRim = new THREE.DirectionalLight(0x77aaff, 1.8);
+showcaseRim.position.set(-2, 2.2, 147);
+scene.add(showcaseRim);
 
 let composer = null;
 if (!isTouch) {
@@ -613,41 +633,142 @@ function buildFallback(s) {
   hero.scale.setScalar(1.05);
 }
 
+let currentLoadId = 0;
+let modelBaseY = 0;
+
 function loadHero(s) {
+  const loadId = ++currentLoadId;
   return new Promise(res => {
     while (hero.children.length) hero.remove(hero.children[0]);
-    rig = null; mixer = null; actions = {};
-    document.getElementById('load').textContent = 'Checking ' + s.model + ' ...';
-    loader.load(
+    rig = null; mixer = null; actions = {}; curAct = null; handBone = null;
+    const loadEl = document.getElementById('load');
+    if (loadEl) loadEl.textContent = 'Loading ' + s.name + ' 3D model ...';
+
+    const baseName = s.model.split('/').pop();
+    const candidatePaths = [
       s.model,
-      gltf => {
-        const m = gltf.scene;
-        const bb = new THREE.Box3().setFromObject(m);
-        m.scale.setScalar(1.85 / (bb.max.y - bb.min.y));
-        m.position.y = -bb.min.y * m.scale.y;
-        m.traverse(o => {
-          if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
-          if (o.isBone && /right.?hand/i.test(o.name)) handBone = o;
-        });
-        hero.add(m);
-        mixer = new THREE.AnimationMixer(m);
-        for (const c of gltf.animations) {
-          const n = c.name.toLowerCase();
-          for (const k of ['idle', 'run', 'swing', 'fall']) {
-            if (n.includes(k)) actions[k] = mixer.clipAction(c);
-          }
+      'models/' + baseName,
+      'public/models/' + baseName
+    ];
+    // Also add known original filenames as fallbacks
+    if (s.name.includes('HOMECOMING')) {
+      candidatePaths.push('models/spider-man_2017_homecoming_-_tech_suit.glb', 'public/models/spider-man_2017_homecoming_-_tech_suit.glb');
+    } else if (s.name.includes('CLASSIC')) {
+      candidatePaths.push('models/spider man 2004 raimi Trilogy.glb', 'public/models/spider man 2004 raimi Trilogy.glb');
+    } else if (s.name.includes('AMAZING')) {
+      candidatePaths.push('models/the_amazing_spider-man_2_spider-man.glb', 'public/models/the_amazing_spider-man_2_spider-man.glb');
+    }
+    const pathsToTry = [...new Set(candidatePaths)];
+
+    function tryLoad(idx) {
+      if (idx >= pathsToTry.length) {
+        console.warn('Could not load 3D GLB model for ' + s.name + ', falling back to procedural athletic model.');
+        if (loadId === currentLoadId) {
+          if (loadEl) loadEl.textContent = '';
+          buildFallback(s);
         }
-        playAct('idle');
-        document.getElementById('load').textContent = 'Model loaded!';
         res();
-      },
-      undefined,
-      () => {
-        document.getElementById('load').textContent = '';
-        buildFallback(s);
-        res();
+        return;
       }
-    );
+
+      loader.load(
+        pathsToTry[idx],
+        gltf => {
+          if (loadId !== currentLoadId) return;
+          const m = gltf.scene;
+
+          m.updateMatrixWorld(true);
+          const bb = new THREE.Box3().setFromObject(m);
+          const size = new THREE.Vector3();
+          bb.getSize(size);
+          const height = size.y;
+          const targetHeight = 1.85;
+          const scale = height > 0.05 ? (targetHeight / height) : 1;
+          m.scale.setScalar(scale);
+          m.updateMatrixWorld(true);
+
+          const scaledBox = new THREE.Box3().setFromObject(m);
+          const center = new THREE.Vector3();
+          scaledBox.getCenter(center);
+
+          // Center horizontally and place feet flat on ground
+          m.position.x = -center.x;
+          m.position.y = -scaledBox.min.y;
+          m.position.z = -center.z;
+          modelBaseY = m.position.y;
+
+          // Texture loader for custom maps (e.g. Raimi diffuse & bump)
+          const texLoader = new THREE.TextureLoader();
+          let diffuseTex = null, bumpTex = null;
+          if (s.texture) {
+            diffuseTex = texLoader.load(s.texture);
+            diffuseTex.colorSpace = THREE.SRGBColorSpace;
+            diffuseTex.flipY = false;
+          }
+          if (s.bumpMap) {
+            bumpTex = texLoader.load(s.bumpMap);
+            bumpTex.flipY = false;
+          }
+
+          m.traverse(o => {
+            if (o.isMesh) {
+              o.castShadow = true;
+              o.receiveShadow = true;
+
+              // Vertex colors support (e.g. Nomad sculpt Raimi mesh)
+              if (o.geometry && o.geometry.attributes.color) {
+                if (o.material) {
+                  o.material.vertexColors = true;
+                  o.material.needsUpdate = true;
+                }
+              }
+
+              // Apply diffuse & bump if provided and mesh has UVs
+              if (o.material && o.geometry && o.geometry.attributes.uv) {
+                if (diffuseTex) {
+                  o.material.map = diffuseTex;
+                  o.material.needsUpdate = true;
+                }
+                if (bumpTex) {
+                  o.material.bumpMap = bumpTex;
+                  o.material.bumpScale = 0.04;
+                  o.material.needsUpdate = true;
+                }
+              }
+
+              // Ensure double-sided rendering so all angles are visible
+              if (o.material) {
+                o.material.side = THREE.DoubleSide;
+              }
+            }
+            if (o.isBone && /right.?hand/i.test(o.name)) handBone = o;
+          });
+
+          hero.add(m);
+
+          // Animation setup if present
+          if (gltf.animations && gltf.animations.length > 0) {
+            mixer = new THREE.AnimationMixer(m);
+            for (const c of gltf.animations) {
+              const n = c.name.toLowerCase();
+              for (const k of ['idle', 'run', 'swing', 'fall']) {
+                if (n.includes(k)) actions[k] = mixer.clipAction(c);
+              }
+            }
+            playAct('idle');
+          }
+
+          if (loadEl) loadEl.textContent = s.name + ' Ready!';
+          res();
+        },
+        undefined,
+        () => {
+          tryLoad(idx + 1);
+        }
+      );
+    }
+
+    tryLoad(0);
   });
 }
 
@@ -816,14 +937,33 @@ let animT = 0;
 function animate(dt) {
   const hs = Math.hypot(vel.x, vel.z);
   const state = onGround ? (hs > 1.5 ? 'run' : 'idle') : swinging ? 'swing' : 'fall';
-  if (mixer) {
+  if (mixer && Object.keys(actions).length > 0) {
     playAct(state);
     if (curAct) curAct.timeScale = state === 'run' ? Math.max(.6, hs / 12) : 1;
     mixer.update(dt);
     if (hero.children[0]) hero.children[0].rotation.x = swinging ? Math.min(.5, hs * .01) : 0;
     return;
   }
-  if (!rig) return;
+  if (!rig) {
+    if (hero.children[0]) {
+      const m = hero.children[0];
+      if (swinging) {
+        m.rotation.x = THREE.MathUtils.lerp(m.rotation.x, Math.min(0.6, hs * 0.012), 1 - Math.exp(-dt * 10));
+        m.rotation.z = THREE.MathUtils.lerp(m.rotation.z, -inp.mx * 0.4, 1 - Math.exp(-dt * 10));
+        m.position.y = modelBaseY;
+      } else if (onGround && hs > 1.5) {
+        const bob = Math.sin(performance.now() * 0.015) * 0.03;
+        m.position.y = modelBaseY + bob;
+        m.rotation.x = THREE.MathUtils.lerp(m.rotation.x, 0.12, 1 - Math.exp(-dt * 10));
+        m.rotation.z = THREE.MathUtils.lerp(m.rotation.z, 0, 1 - Math.exp(-dt * 10));
+      } else {
+        m.position.y = modelBaseY;
+        m.rotation.x = THREE.MathUtils.lerp(m.rotation.x, 0, 1 - Math.exp(-dt * 10));
+        m.rotation.z = THREE.MathUtils.lerp(m.rotation.z, 0, 1 - Math.exp(-dt * 10));
+      }
+    }
+    return;
+  }
   const t = {};
   if (onGround) {
     animT += dt * (5 + hs * .55);
@@ -1093,10 +1233,34 @@ function drawHUD(dt) {
     : `Reach the Empire State spire · ${Math.round(d)} m`;
 }
 
-/* ================= LOOP ================= */
+/* ================= 3D MODEL PREVIEW & LOOP ================= */
+// Load initial suit for immediate 3D viewing on start
+loadHero(SUITS[suitKey]);
+
+// Interactive 3D Model drag-to-rotate in Menu
+let menuRot = 0;
+let isDraggingMenu = false, lastMenuX = 0;
+window.addEventListener('pointerdown', e => {
+  if (!playing && !e.target.closest('#suits') && !e.target.closest('#play')) {
+    isDraggingMenu = true;
+    lastMenuX = e.clientX;
+  }
+});
+window.addEventListener('pointermove', e => {
+  if (!playing && isDraggingMenu) {
+    const dx = e.clientX - lastMenuX;
+    menuRot += dx * 0.008;
+    lastMenuX = e.clientX;
+  }
+});
+window.addEventListener('pointerup', () => isDraggingMenu = false);
+window.addEventListener('pointercancel', () => isDraggingMenu = false);
+
 document.getElementById('play').onclick = async () => {
   initAudio();
-  await loadHero(SUITS[suitKey]);
+  if (!hero.children.length) {
+    await loadHero(SUITS[suitKey]);
+  }
   document.getElementById('hname').textContent = 'SPIDER-MAN · ' + SUITS[suitKey].name;
   document.getElementById('menu').style.display = 'none';
   document.getElementById('hud').style.display = 'block';
@@ -1122,15 +1286,21 @@ renderer.setAnimationLoop(() => {
   }
 
   if (playing) {
+    showcaseLight.intensity = 0;
+    showcaseRim.intensity = 0;
     update(dt / 2);
     update(dt / 2);
     afterPhysics();
     updateCamera(dt);
     drawHUD(dt);
   } else {
-    const t = performance.now() * .00005;
-    camera.position.set(Math.sin(t) * 260, 160, 150 + Math.cos(t) * 260);
-    camera.lookAt(35, 80, -26);
+    showcaseLight.intensity = 2.5;
+    showcaseRim.intensity = 1.8;
+    if (!isDraggingMenu) menuRot += dt * 0.45;
+    hero.position.set(0, 0, 150);
+    hero.rotation.y = menuRot;
+    camera.position.set(0, 1.15, 153.3);
+    camera.lookAt(0, 0.95, 150);
     sky.position.copy(camera.position);
   }
 

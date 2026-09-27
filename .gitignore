@@ -1,0 +1,2 @@
+# Ignore large 3D model files (GitHub max file size is 100MB)
+*.glb
