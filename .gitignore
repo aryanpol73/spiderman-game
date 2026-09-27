@@ -2,6 +2,14 @@
 node_modules
 dist
 
+# Android build outputs & binaries
+*.apk
+*.aab
+android/.gradle
+android/build
+android/app/build
+android/local.properties
+
 # Large 3D binary assets (GitHub max file size is 100MB)
 *.glb
 
