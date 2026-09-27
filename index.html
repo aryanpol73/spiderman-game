@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Spider-Man: NYC Swing</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',Arial,sans-serif;color:#fff;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block}
+/* ---------- MENU ---------- */
+#menu{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ background:radial-gradient(ellipse at center,rgba(120,0,0,.55),rgba(0,0,0,.92));padding:20px;overflow:auto}
+#menu h1{margin:0;font-size:clamp(32px,6vw,64px);letter-spacing:4px;font-weight:900;font-style:italic;
+ text-shadow:0 0 20px #f00,3px 3px 0 #200}
+#menu h1 span{color:#e11}
+#menu p.sub{opacity:.75;margin:6px 0 22px;letter-spacing:3px;font-size:13px}
+#suits{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.suit{width:190px;padding:14px;border-radius:14px;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.15);
+ cursor:pointer;transition:.2s;text-align:center}
+.suit:hover{transform:translateY(-4px)}
+.suit.sel{border-color:#e11;background:rgba(225,17,17,.18);box-shadow:0 0 25px rgba(255,0,0,.45)}
+.suit .sw{height:90px;border-radius:10px;margin-bottom:10px}
+.suit b{display:block;font-size:15px}.suit small{opacity:.7;font-size:12px}
+#play{margin-top:26px;padding:14px 60px;font-size:20px;font-weight:800;letter-spacing:3px;border:0;border-radius:40px;
+ background:linear-gradient(90deg,#b00,#f22);color:#fff;cursor:pointer;box-shadow:0 0 30px rgba(255,0,0,.6);transition:transform 0.15s}
+#play:hover{transform:scale(1.05)}
+#help{margin-top:18px;font-size:12px;opacity:.7;text-align:center;line-height:1.7}
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0;pointer-events:none;display:none;z-index:5}
+#topl{position:absolute;top:14px;left:16px}
+#topl .nm{font-size:12px;font-weight:800;letter-spacing:2px}
+#hp{width:220px;height:6px;background:rgba(255,255,255,.2);margin-top:5px;border-radius:3px;overflow:hidden}
+#hp i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#fff,#ddd);transition:width 0.15s ease}
+#topr{position:absolute;top:14px;right:16px;text-align:right}
+#district{font-size:13px;font-weight:800;letter-spacing:2px;color:#ff4747}
+#obj{font-size:12px;opacity:.85;margin-top:3px}
+#mapwrap{position:absolute;left:16px;bottom:16px;width:150px;height:150px;border-radius:50%;overflow:hidden;
+ border:3px solid rgba(255,255,255,.35);background:#0a1420;box-shadow:0 0 15px rgba(0,0,0,.6)}
+#speedo{position:absolute;left:176px;bottom:22px;font-weight:900;font-size:30px;font-style:italic}
+#speedo small{font-size:11px;opacity:.7;display:block;font-style:normal;letter-spacing:2px}
+#prompt{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);font-size:12px;letter-spacing:2px;
+ background:rgba(0,0,0,.55);padding:7px 14px;border-radius:6px}
+#cross{position:absolute;top:50%;left:50%;width:8px;height:8px;margin:-4px;border:2px solid #fff;border-radius:50%;opacity:.6}
+/* ---------- TOUCH ---------- */
+#touch{display:none;position:fixed;inset:0;z-index:6;pointer-events:none}
+#joy{position:absolute;left:30px;bottom:40px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.08);
+ border:2px solid rgba(255,255,255,.3);pointer-events:auto}
+#knob{position:absolute;left:45px;top:45px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.55)}
+.tb{position:absolute;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;
+ background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.4);pointer-events:auto}
+.tb.on{background:rgba(225,17,17,.6)}
+#bWeb{right:40px;bottom:60px;width:95px;height:95px;background:rgba(200,0,0,.35)}
+#bJump{right:150px;bottom:30px;width:65px;height:65px}
+#bSprint{right:50px;bottom:170px;width:65px;height:65px;font-size:11px}
+@media (max-width:700px){#hp{width:140px}#mapwrap{width:100px;height:100px;top:60px;bottom:auto;left:auto;right:12px}
+ #speedo{left:auto;right:16px;top:170px;bottom:auto}#prompt{display:none}}
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <h1>SPIDER-MAN <span>NYC</span></h1>
+  <p class="sub">CHOOSE YOUR SUIT</p>
+  <div id="suits"></div>
+  <button id="play">PLAY</button>
+  <div id="help">
+    Desktop: WASD move · Mouse look · Hold Left Click / E / Space-in-air to web swing · Shift sprint · Space jump · Q web-zip<br>
+    Mobile: Left joystick move · Drag right side to look · WEB hold to swing · JUMP · SPRINT
+  </div>
+</div>
+
+<div id="hud">
+  <div id="topl"><div class="nm" id="heroName">SPIDER-MAN</div><div id="hp"><i></i></div></div>
+  <div id="topr"><div id="district">MIDTOWN</div><div id="obj">Free roam · Reach the Empire State spire</div></div>
+  <div id="mapwrap"><canvas id="map" width="300" height="300" style="width:100%;height:100%"></canvas></div>
+  <div id="speedo"><span id="spd">0</span><small>KM/H</small></div>
+  <div id="prompt">HOLD LEFT CLICK TO WEB SWING · Q TO WEB-ZIP</div>
+  <div id="cross"></div>
+</div>
+
+<div id="touch">
+  <div id="joy"><div id="knob"></div></div>
+  <div class="tb" id="bWeb">WEB</div>
+  <div class="tb" id="bJump">JUMP</div>
+  <div class="tb" id="bSprint">SPRINT</div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* =========================================================
+   SUIT DEFINITIONS
+   ========================================================= */
+const SUITS = {
+  tom:   { name:'HOMECOMING SUIT', sub:'Tom Holland era', main:'#d0141e', sec:'#1b3fb8', trim:'#0b0b0b',
+           web:'rgba(10,10,10,.9)', eyeW:1.25, eyeH:0.95, outline:0.022, raised:false, emblemScale:0.8, rough:0.45 },
+  tobey: { name:'CLASSIC 2002 SUIT', sub:'Tobey Maguire era', main:'#9e0d12', sec:'#0f2a78', trim:'#1a1a1a',
+           web:'rgba(40,40,40,.95)', eyeW:1.0, eyeH:0.8, outline:0.012, raised:true, emblemScale:1.2, rough:0.35, eyeTint:0xcfd8e0 },
+  andrew:{ name:'AMAZING SUIT', sub:'Andrew Garfield era', main:'#e3121a', sec:'#1c5fd8', trim:'#101010',
+           web:'rgba(20,20,20,.85)', eyeW:1.15, eyeH:1.0, outline:0.01, raised:false, emblemScale:1.0, rough:0.5, eyeTint:0xf2c14e }
+};
+let suitKey = 'tom';
+const suitsDiv = document.getElementById('suits');
+for (const k in SUITS) {
+  const s = SUITS[k], d = document.createElement('div');
+  d.className = 'suit' + (k === suitKey ? ' sel' : '');
+  d.innerHTML = `<div class="sw" style="background:linear-gradient(135deg,${s.main} 55%,${s.sec} 55%)"></div><b>${s.name}</b><small>${s.sub}</small>`;
+  d.onclick = () => {
+    suitKey = k;
+    document.querySelectorAll('.suit').forEach(e => e.classList.remove('sel'));
+    d.classList.add('sel');
+    buildHero(SUITS[k]);
+  };
+  suitsDiv.appendChild(d);
+}
+
+/* =========================================================
+   RENDERER / SCENE
+   ========================================================= */
+const isTouch = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
+const renderer = new THREE.WebGLRenderer({ antialias: !isTouch, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const FOG = 0xe8c9a8;
+scene.fog = new THREE.Fog(FOG, 150, 900);
+
+// gradient sky dome
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite:false, fog:false,
+  uniforms:{ top:{value:new THREE.Color(0x3a6fb5)}, mid:{value:new THREE.Color(0xf3c9a0)}, bot:{value:new THREE.Color(FOG)} },
+  vertexShader:`varying vec3 v; void main(){ v=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+  fragmentShader:`uniform vec3 top,mid,bot; varying vec3 v; void main(){ float h=v.y;
+    vec3 c = h>0.? mix(mid,top,pow(h,0.6)) : bot; gl_FragColor=vec4(c,1.); }`
+});
+const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 16), skyMat); scene.add(sky);
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 2000);
+scene.add(new THREE.HemisphereLight(0xbcd4ff, 0x4a3b30, 0.9));
+const sun = new THREE.DirectionalLight(0xffd6a8, 2.4);
+sun.castShadow = true;
+sun.shadow.mapSize.set(isTouch ? 1024 : 2048, isTouch ? 1024 : 2048);
+Object.assign(sun.shadow.camera, { left:-80, right:80, top:80, bottom:-80, near:1, far:400 });
+sun.shadow.bias = -0.0005;
+scene.add(sun, sun.target);
+
+/* =========================================================
+   SOUND EFFECTS (Web Audio API)
+   ========================================================= */
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playThwip() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(800, now);
+  osc.frequency.exponentialRampToValueAtTime(140, now + 0.14);
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.15);
+}
+
+/* =========================================================
+   TEXTURES
+   ========================================================= */
+function windowTex(base, glass, litChance, style) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = base; g.fillRect(0,0,128,128);
+  for (let y=0;y<4;y++) for (let x=0;x<4;x++) {
+    const lit = Math.random() < litChance;
+    g.fillStyle = lit ? `hsl(${40+Math.random()*15},80%,${65+Math.random()*20}%)` : glass;
+    if (style===0) g.fillRect(x*32+5, y*32+6, 22, 20);
+    else if (style===1) g.fillRect(x*32+2, y*32+10, 28, 14);
+    else g.fillRect(x*32+10, y*32+3, 12, 26);
+    g.fillStyle='rgba(255,255,255,.12)'; g.fillRect(x*32+5, y*32+6, 22, 3);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+const bMats = [
+  ['#8a5a44','#2c3a4a',.12,0], ['#b8a78a','#34414f',.1,0], ['#6d6f73','#1d2d3d',.15,1],
+  ['#c9c2b5','#3a4a5a',.1,2], ['#3d4652','#7fa7c9',.05,1], ['#9c7b5b','#253444',.12,2], ['#5a3d33','#2a3542',.18,0]
+].map(a => new THREE.MeshStandardMaterial({ map: windowTex(...a), roughness:.75, metalness:.1 }));
+const roofMat = new THREE.MeshStandardMaterial({ color:0x4a4a4e, roughness:.95 });
+
+function suitTexture(s) {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d');
+  g.fillStyle = s.main; g.fillRect(0,0,512,512);
+  g.strokeStyle = s.web; g.lineWidth = s.raised ? 4 : 2.5;
+  for (let x=0;x<=512;x+=48){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,512); g.stroke(); }
+  for (let y=0;y<=512;y+=40){ g.beginPath();
+    for (let x=0;x<=512;x+=3){ const yy=y+9*Math.sin((x%48)/48*Math.PI); x?g.lineTo(x,yy):g.moveTo(x,yy);} g.stroke(); }
+  if (s.raised) { g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=1;
+    for (let x=2;x<=512;x+=48){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,512); g.stroke(); } }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2,2);
+  t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+/* =========================================================
+   MANHATTAN MAP
+   Grid: x = east(+)/west(-), z = south(+)/north(-)
+   ========================================================= */
+const buildings = [], webTargets = [];
+const AVE = 64, ST = 34, ROAD = 12;
+const XMIN = -224, XMAX = 224, ZMIN = -760, ZMAX = 560;
+
+// ground, streets, rivers
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 1500), new THREE.MeshStandardMaterial({ color:0x2b2b2f, roughness:1 }));
+ground.rotation.x = -Math.PI/2; ground.position.z = -100; ground.receiveShadow = true; scene.add(ground);
+const water = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000),
+  new THREE.MeshStandardMaterial({ color:0x2d5570, roughness:.15, metalness:.6 }));
+water.rotation.x = -Math.PI/2; water.position.y = -0.6; scene.add(water);
+// sidewalks (blocks) and lane markings
+const lineMat = new THREE.MeshBasicMaterial({ color:0xd8c060 });
+for (let x = XMIN; x < XMAX; x += AVE) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.4, ZMAX-ZMIN), lineMat);
+  m.rotation.x = -Math.PI/2; m.position.set(x, 0.02, (ZMIN+ZMAX)/2); scene.add(m);
+}
+
+// Central Park
+const PARK = { minX:-96, maxX:96, minZ:-560, maxZ:-300 };
+const park = new THREE.Mesh(new THREE.PlaneGeometry(PARK.maxX-PARK.minX, PARK.maxZ-PARK.minZ),
+  new THREE.MeshStandardMaterial({ color:0x3f7a35, roughness:1 }));
+park.rotation.x = -Math.PI/2; park.position.set(0, 0.05, (PARK.minZ+PARK.maxZ)/2); park.receiveShadow = true; scene.add(park);
+const lake = new THREE.Mesh(new THREE.CircleGeometry(28, 32), water.material);
+lake.rotation.x = -Math.PI/2; lake.position.set(10, 0.08, -470); scene.add(lake);
+const treeGeo = new THREE.SphereGeometry(3, 8, 6), treeMat = new THREE.MeshStandardMaterial({ color:0x2f6a2a, roughness:1 });
+const trees = new THREE.InstancedMesh(treeGeo, treeMat, 260); const dm = new THREE.Object3D();
+for (let i=0;i<260;i++){ dm.position.set(PARK.minX+6+Math.random()*(PARK.maxX-PARK.minX-12), 3, PARK.minZ+6+Math.random()*(PARK.maxZ-PARK.minZ-12));
+  const s=0.7+Math.random()*0.8; dm.scale.set(s,s*1.2,s); dm.updateMatrix(); trees.setMatrixAt(i, dm.matrix); }
+trees.castShadow = true; scene.add(trees);
+
+function district(z, x) {
+  if (x > XMAX+5 || x < XMIN-5) return 'RIVER';
+  if (z < PARK.maxZ && z > PARK.minZ && Math.abs(x) < PARK.maxX) return 'CENTRAL PARK';
+  if (z < PARK.minZ) return 'HARLEM';
+  if (z < -300) return 'UPPER EAST / WEST SIDE';
+  if (z < -150) return "HELL'S KITCHEN / TIMES SQ";
+  if (z < 60) return 'MIDTOWN';
+  if (z < 300) return 'CHELSEA / GREENWICH VILLAGE';
+  return 'FINANCIAL DISTRICT';
+}
+function heightAt(x, z) {
+  const midtown = Math.exp(-((z+60)**2)/(2*140**2)) * 150;
+  const fidi    = Math.exp(-((z-470)**2)/(2*70**2)) * 170;
+  const edge    = 1 - Math.min(1, Math.abs(x)/260) * 0.4;
+  return (25 + midtown + fidi) * edge * (0.45 + Math.random()*0.75);
+}
+
+function addBuilding(x, z, w, d, h, mat) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const uv = geo.attributes.uv, n = geo.attributes.normal;
+  for (let i=0;i<uv.count;i++){
+    const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i));
+    const su = ny>0.5 ? 0 : (nx>0.5 ? d : w) / 7, sv = ny>0.5 ? 0 : h / 7;
+    uv.setXY(i, uv.getX(i)*su, uv.getY(i)*sv);
+  }
+  const m = new THREE.Mesh(geo, [mat, mat, roofMat, roofMat, mat, mat]);
+  m.position.set(x, h/2, z); m.castShadow = m.receiveShadow = true;
+  scene.add(m); webTargets.push(m);
+  buildings.push({ minX:x-w/2, maxX:x+w/2, minZ:z-d/2, maxZ:z+d/2, h, cx:x, cz:z });
+  return m;
+}
+
+const tankGeo = new THREE.CylinderGeometry(1.6, 1.6, 3, 10), tankMat = new THREE.MeshStandardMaterial({ color:0x6b4a32, roughness:.9 });
+const reserved = (x,z) => (Math.abs(x) < 20 && Math.abs(z-150) < 20); // spawn plaza
+for (let x = XMIN + AVE/2; x < XMAX; x += AVE) {
+  for (let z = ZMIN + ST/2; z < ZMAX; z += ST) {
+    if (x > PARK.minX && x < PARK.maxX && z > PARK.minZ && z < PARK.maxZ) continue;
+    if (reserved(x, z)) continue;
+    const bw = AVE - ROAD, bd = ST - ROAD;
+    const split = Math.random() < 0.55;
+    const parts = split ? [[x - bw/4, bw/2 - 1], [x + bw/4, bw/2 - 1]] : [[x, bw]];
+    for (const [px, pw] of parts) {
+      const h = heightAt(px, z), mat = bMats[(Math.random()*bMats.length)|0];
+      addBuilding(px, z, pw, bd, h, mat);
+      if (h < 90 && Math.random() < 0.35) { const t = new THREE.Mesh(tankGeo, tankMat);
+        t.position.set(px + (Math.random()-0.5)*pw*0.5, h + 3.2, z); t.castShadow = true; scene.add(t); }
+    }
+  }
+}
+
+// ---- Landmarks ----
+const stoneMat = new THREE.MeshStandardMaterial({ color:0xcfc6b0, roughness:.6, metalness:.1, map: windowTex('#cfc6b0','#3b4654',.15,2) });
+function stacked(x, z, tiers) {
+  let y = 0;
+  for (const [w,d,h] of tiers) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), stoneMat);
+    m.position.set(x, y + h/2, z); m.castShadow = m.receiveShadow = true; scene.add(m); webTargets.push(m);
+    buildings.push({ minX:x-w/2, maxX:x+w/2, minZ:z-d/2, maxZ:z+d/2, h:y+h, base:y, cx:x, cz:z });
+    y += h;
+  }
+  return y;
+}
+// Empire State style
+const esX = 32, esZ = -20;
+buildings.splice(0, buildings.length, ...buildings.filter(b => !(Math.abs(b.cx-esX) < 40 && Math.abs(b.cz-esZ) < 25)));
+webTargets.forEach(m => { if (Math.abs(m.position.x-esX) < 40 && Math.abs(m.position.z-esZ) < 25) m.visible = false; });
+const esTop = stacked(esX, esZ, [[50,22,40],[36,18,150],[26,14,50],[16,10,25],[8,8,12]]);
+const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 1.5, 40, 8), new THREE.MeshStandardMaterial({ color:0xdddddd, metalness:.8, roughness:.3 }));
+spire.position.set(esX, esTop + 20, esZ); scene.add(spire);
+const beacon = new THREE.PointLight(0xff3030, 40, 80); beacon.position.set(esX, esTop + 42, esZ); scene.add(beacon);
+
+// Chrysler style (crown cone)
+const chX = 96, chZ = -80;
+webTargets.forEach(m => { if (Math.abs(m.position.x-chX) < 30 && Math.abs(m.position.z-chZ) < 18) m.visible = false; });
+for (let i = buildings.length-1; i >= 0; i--) { const b = buildings[i]; if (Math.abs(b.cx-chX) < 30 && Math.abs(b.cz-chZ) < 18 && !b.base) buildings.splice(i,1); }
+const chTop = stacked(chX, chZ, [[40,20,30],[22,18,170]]);
+const crown = new THREE.Mesh(new THREE.ConeGeometry(11, 45, 8), new THREE.MeshStandardMaterial({ color:0xe6e6ea, metalness:1, roughness:.2 }));
+crown.position.set(chX, chTop + 22, chZ); crown.castShadow = true; scene.add(crown);
+for (let i = webTargets.length-1; i>=0; i--) if (!webTargets[i].visible) { scene.remove(webTargets[i]); webTargets.splice(i,1); }
+
+// Times Square billboards
+const bbColors = ['#ff2d55','#00d4ff','#ffd400','#7cff4f','#ff7a00','#c04bff'];
+for (let i = 0; i < 18; i++) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = bbColors[i % 6]; g.fillRect(0,0,128,64); g.fillStyle = '#fff'; g.font = 'bold 26px Arial';
+  g.fillText(['BUGLE','OSCORP','STARK','NYC','DAILY','ROXXON'][i%6], 10, 42);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const bb = new THREE.Mesh(new THREE.PlaneGeometry(14, 7), new THREE.MeshBasicMaterial({ map:t, side:THREE.DoubleSide }));
+  const side = i % 2 ? 1 : -1;
+  bb.position.set(side * (AVE/2 - ROAD/2 - 0.4) - 32 + side*0.0, 14 + (i%3)*9, -190 - Math.floor(i/2)*8);
+  bb.rotation.y = side * Math.PI/2 * -1; scene.add(bb);
+}
+
+// Traffic
+const carGeo = new THREE.BoxGeometry(2.2, 1.5, 4.5), cars = [];
+const carCols = [0xf2c200, 0xf2c200, 0xf2c200, 0xdddddd, 0x222222, 0xaa1111, 0x1d4fa0];
+for (let i = 0; i < 90; i++) {
+  const m = new THREE.Mesh(carGeo, new THREE.MeshStandardMaterial({ color: carCols[i % carCols.length], metalness:.5, roughness:.35 }));
+  const lane = XMIN + ((i % 7) + 0) * AVE + (i%2 ? 3 : -3);
+  m.position.set(lane, 0.85, ZMIN + Math.random() * (ZMAX-ZMIN)); m.castShadow = true;
+  cars.push({ m, dir: i%2 ? 1 : -1, sp: 10 + Math.random()*8 }); scene.add(m);
+}
+
+/* =========================================================
+   HERO MODEL (built from suit config)
+   ========================================================= */
+const hero = new THREE.Group(); scene.add(hero);
+let rig = null;
+function buildHero(s) {
+  while (hero.children.length) hero.remove(hero.children[0]);
+  const red = new THREE.MeshStandardMaterial({ map: suitTexture(s), roughness: s.rough });
+  const blue = new THREE.MeshStandardMaterial({ color: s.sec, roughness: s.rough });
+  const black = new THREE.MeshStandardMaterial({ color: s.trim, roughness: .4 });
+  const eyeM = new THREE.MeshStandardMaterial({ color: s.eyeTint || 0xffffff, emissive: 0x333333, metalness: s.eyeTint ? .6 : 0, roughness: .15 });
+  const P = (geo, mat, parent, x=0,y=0,z=0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x,y,z); m.castShadow = true; parent.add(m); return m; };
+
+  const body = new THREE.Group(); hero.add(body);
+  const hips = new THREE.Group(); hips.position.y = 1.0; body.add(hips);
+  P(new THREE.CapsuleGeometry(.26,.2,4,12), blue, hips, 0,.05,0).scale.set(1.05,1,.85);
+  const chest = P(new THREE.CapsuleGeometry(.32,.42,6,16), red, hips, 0,.55,0); chest.scale.set(1.18,1,.78);
+  P(new THREE.CylinderGeometry(.28,.3,.08,16), red, hips, 0,.2,0).scale.set(1.08,1,.85);
+  for (const sd of [-1,1]) P(new THREE.CapsuleGeometry(.08,.4,4,8), blue, hips, sd*.33,.5,0).scale.set(1,1,1.6);
+  // emblem
+  const em = new THREE.Group(); em.position.set(0,.66,.255); em.scale.setScalar(s.emblemScale); hips.add(em);
+  P(new THREE.SphereGeometry(.04,12,8), black, em).scale.set(1,1.7,.4);
+  P(new THREE.SphereGeometry(.028,12,8), black, em, 0,.075,0).scale.set(1,1,.4);
+  for (const sd of [-1,1]) for (let k=0;k<4;k++){ const l = P(new THREE.BoxGeometry(.15,.013,.01), black, em, sd*.075,.045-k*.03,0); l.rotation.z = sd*(.6-k*.4); }
+  // head
+  P(new THREE.CylinderGeometry(.11,.14,.16,12), red, hips, 0,1.12,0);
+  const head = new THREE.Group(); head.position.y = 1.38; hips.add(head);
+  P(new THREE.SphereGeometry(.29,32,24), red, head).scale.set(.88,1.1,.95);
+  for (const sd of [-1,1]) {
+    const o = P(new THREE.SphereGeometry(.09+s.outline,20,12), black, head, sd*.11,.03,.25);
+    o.scale.set(s.eyeW*1.05, s.eyeH*.85, .3); o.rotation.set(0, sd*.45, sd*-.5);
+    const e = P(new THREE.SphereGeometry(.085,20,12), eyeM, head, sd*.112,.03,.262);
+    e.scale.set(s.eyeW, s.eyeH*.8, .3); e.rotation.set(0, sd*.45, sd*-.5);
+  }
+  const arm = sd => { const sh = new THREE.Group(); sh.position.set(sd*.44,.93,0); hips.add(sh);
+    P(new THREE.SphereGeometry(.14,16,12), red, sh);
+    P(new THREE.CapsuleGeometry(.095,.3,4,12), blue, sh, 0,-.24,0);
+    const el = new THREE.Group(); el.position.y = -.48; sh.add(el);
+    P(new THREE.CapsuleGeometry(.085,.28,4,12), red, el, 0,-.2,0);
+    const hand = P(new THREE.SphereGeometry(.095,16,12), red, el, 0,-.45,0); hand.scale.set(1,1.2,.8);
+    return { sh, el, hand }; };
+  const leg = sd => { const hp = new THREE.Group(); hp.position.set(sd*.16,-.05,0); hips.add(hp);
+    P(new THREE.CapsuleGeometry(.12,.3,4,12), blue, hp, 0,-.24,0);
+    const kn = new THREE.Group(); kn.position.y = -.48; hp.add(kn);
+    P(new THREE.CapsuleGeometry(.1,.2,4,12), blue, kn, 0,-.15,0);
+    P(new THREE.CapsuleGeometry(.105,.18,4,12), red, kn, 0,-.3,0);
+    P(new THREE.BoxGeometry(.17,.1,.3), red, kn, 0,-.43,.05);
+    return { hp, kn }; };
+  rig = { body, L:{ arm:arm(1), leg:leg(1) }, R:{ arm:arm(-1), leg:leg(-1) } };
+  hero.scale.setScalar(1.1);
+}
+
+// web line
+const webGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+const webLine = new THREE.Line(webGeo, new THREE.LineBasicMaterial({ color:0xffffff, linewidth: 2 }));
+webLine.frustumCulled = false; webLine.visible = false; scene.add(webLine);
+
+/* =========================================================
+   INPUT (keyboard + mouse + touch)
+   ========================================================= */
+const keys = {};
+const input = { mx:0, mz:0, web:false, jump:false, sprint:false, zip:false };
+let yaw = Math.PI, pitch = 0.25, playing = false;
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space') e.preventDefault();
+  if (e.code === 'KeyQ') input.zip = true;
+});
+addEventListener('keyup', e => keys[e.code] = false);
+const locked = () => document.pointerLockElement === renderer.domElement;
+renderer.domElement.addEventListener('click', () => { if (playing && !isTouch && !locked()) renderer.domElement.requestPointerLock(); });
+addEventListener('mousemove', e => {
+  if (!locked()) return;
+  yaw -= e.movementX * .0025;
+  pitch = THREE.MathUtils.clamp(pitch + e.movementY * .0025, -.4, 1.2);
+});
+let mouseWeb = false;
+addEventListener('mousedown', e => {
+  if (locked() && e.button === 0) mouseWeb = true;
+  if (locked() && e.button === 2) input.zip = true;
+});
+addEventListener('mouseup', e => { if (e.button === 0) mouseWeb = false; });
+addEventListener('contextmenu', e => e.preventDefault());
+
+// --- touch controls ---
+const joy = document.getElementById('joy'), knob = document.getElementById('knob');
+let joyId = null, lookId = null, lookLast = null, touchWeb = false, touchJump = false, touchSprint = false;
+joy.addEventListener('pointerdown', e => { joyId = e.pointerId; joy.setPointerCapture(e.pointerId); moveJoy(e); });
+joy.addEventListener('pointermove', e => { if (e.pointerId === joyId) moveJoy(e); });
+const endJoy = e => { if (e.pointerId !== joyId) return; joyId = null; input.mx = input.mz = 0; knob.style.transform = ''; };
+joy.addEventListener('pointerup', endJoy); joy.addEventListener('pointercancel', endJoy);
+function moveJoy(e) {
+  const r = joy.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
+  let dx = e.clientX - cx, dy = e.clientY - cy; const max = r.width/2, l = Math.hypot(dx, dy);
+  if (l > max) { dx *= max/l; dy *= max/l; }
+  knob.style.transform = `translate(${dx}px,${dy}px)`;
+  input.mx = dx/max; input.mz = dy/max;
+}
+const hold = (id, on, off) => {
+  const b = document.getElementById(id);
+  b.addEventListener('pointerdown', e => { e.stopPropagation(); b.classList.add('on'); on(); });
+  const up = () => { b.classList.remove('on'); off && off(); };
+  b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('pointerleave', up);
+};
+hold('bWeb', () => touchWeb = true, () => touchWeb = false);
+hold('bJump', () => touchJump = true, () => touchJump = false);
+document.getElementById('bSprint').addEventListener('pointerdown', e => { touchSprint = !touchSprint; e.currentTarget.classList.toggle('on', touchSprint); });
+
+renderer.domElement.addEventListener('pointerdown', e => { if (!isTouch || lookId !== null) return; lookId = e.pointerId; lookLast = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointermove', e => {
+  if (e.pointerId !== lookId) return;
+  yaw -= (e.clientX - lookLast[0]) * .005;
+  pitch = THREE.MathUtils.clamp(pitch + (e.clientY - lookLast[1]) * .005, -.4, 1.2);
+  lookLast = [e.clientX, e.clientY];
+});
+const endLook = e => { if (e.pointerId === lookId) lookId = null; };
+renderer.domElement.addEventListener('pointerup', endLook); renderer.domElement.addEventListener('pointercancel', endLook);
+
+function readInput() {
+  if (!isTouch || joyId === null) {
+    input.mx = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+    input.mz = (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0);
+  }
+  input.jump = keys.Space || touchJump;
+  input.sprint = keys.ShiftLeft || keys.ShiftRight || touchSprint;
+  input.web = mouseWeb || keys.KeyE || touchWeb || (keys.Space && !onGround);
+}
+
+/* =========================================================
+   PHYSICS
+   ========================================================= */
+const pos = new THREE.Vector3(0, 0, 150), vel = new THREE.Vector3(), anchor = new THREE.Vector3();
+let onGround = true, swinging = false, ropeLen = 0, touchingWall = false, zipT = 0, health = 1;
+const GRAV = -34, RC = 0.45, ray = new THREE.Raycaster(), UP = new THREE.Vector3(0,1,0);
+const V = () => new THREE.Vector3();
+
+function tryAttach() {
+  const origin = pos.clone().add(new THREE.Vector3(0, 1.5, 0));
+  const hv = Math.hypot(vel.x, vel.z);
+  const baseYaw = hv > 4 ? Math.atan2(-vel.x, -vel.z) : yaw;
+  for (const side of [0.55, -0.55, 0.3, -0.3, 0.85, -0.85]) {
+    const f = new THREE.Vector3(-Math.sin(baseYaw + side), 0, -Math.cos(baseYaw + side));
+    for (const a of [0.85, 0.65, 1.05]) {
+      const dir = f.clone().multiplyScalar(Math.cos(a)).addScaledVector(UP, Math.sin(a)).normalize();
+      ray.set(origin, dir); ray.far = 110;
+      const hit = ray.intersectObjects(webTargets, false)[0];
+      if (hit && hit.point.y > origin.y + 4) { anchor.copy(hit.point); playThwip(); return true; }
+    }
+  }
+  if (pos.y > 5) {
+    anchor.copy(origin).addScaledVector(new THREE.Vector3(-Math.sin(baseYaw),0,-Math.cos(baseYaw)), 28).y += 38;
+    playThwip();
+    return true;
+  }
+  return false;
+}
+
+function webZip() {
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+  ray.set(camera.position, dir); ray.far = 160;
+  const hit = ray.intersectObjects(webTargets, false)[0];
+  if (!hit) return;
+  anchor.copy(hit.point); swinging = false; zipT = 0.35;
+  vel.copy(hit.point.clone().sub(pos).normalize().multiplyScalar(70)); vel.y += 8;
+  playThwip();
+}
+const angLerp = (a, b, t) => { const d = ((b - a + Math.PI) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI) - Math.PI; return a + d*t; };
+
+/* =========================================================
+   ANIMATION
+   ========================================================= */
+const pose = { lAX:0,lAZ:0,rAX:0,rAZ:0,lE:0,rE:0,lL:0,rL:0,lK:0,rK:0,tilt:0,roll:0 };
+let animT = 0;
+function animateHero(dt, mvx) {
+  const hs = Math.hypot(vel.x, vel.z), t = {};
+  if (onGround) {
+    animT += dt * (4 + hs * .6);
+    const amp = Math.min(1, hs/10) * .9, s = Math.sin(animT) * amp;
+    Object.assign(t, { lAX:-s, rAX:s, lAZ:.12, rAZ:-.12, lE:-.5*amp, rE:-.5*amp, lL:s, rL:-s,
+      lK:Math.max(0,-s)*1.3, rK:Math.max(0,s)*1.3, tilt: amp*.3 });
+  } else if (swinging) {
+    Object.assign(t, { rAX:-2.9, rAZ:-.25, lAX:.5, lAZ:.7, lE:-.9, lL:-1.0, rL:-.2, lK:1.5, rK:.4,
+      tilt: Math.min(.6, hs*.012), roll: -mvx*.3 });
+  } else if (zipT > 0) {
+    Object.assign(t, { rAX:-3, lAX:-3, rAZ:-.2, lAZ:.2, lL:.2, rL:.2, tilt:1.2 });
+  } else if (touchingWall && input.mz < 0) {
+    const s = Math.sin(performance.now() * .014);
+    Object.assign(t, { lAX:-2.6+s, rAX:-2.6-s, lAZ:.3, rAZ:-.3, lE:-.6, rE:-.6, lL:-1-s*.5, rL:-1+s*.5, lK:1.6, rK:1.6, tilt:-.2 });
+  } else {
+    const flip = vel.y > 5 ? 0 : 1;
+    Object.assign(t, { lAX:-.6, rAX:-.4, lAZ:1.4, rAZ:-1.4, lE:-.4, rE:-.3, lL:-.7*flip-.2, rL:.3, lK:1.2, rK:.3, tilt:.5 });
+  }
+  const k = 1 - Math.exp(-dt * 12);
+  for (const key in pose) pose[key] += ((t[key] ?? 0) - pose[key]) * k;
+  const { L, R, body } = rig;
+  L.arm.sh.rotation.set(pose.lAX, 0, pose.lAZ); R.arm.sh.rotation.set(pose.rAX, 0, pose.rAZ);
+  L.arm.el.rotation.x = pose.lE; R.arm.el.rotation.x = pose.rE;
+  L.leg.hp.rotation.x = pose.lL; R.leg.hp.rotation.x = pose.rL;
+  L.leg.kn.rotation.x = pose.lK; R.leg.kn.rotation.x = pose.rK;
+  body.rotation.set(pose.tilt, 0, pose.roll);
+}
+
+/* =========================================================
+   UPDATE
+   ========================================================= */
+function update(dt) {
+  readInput();
+  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  const mv = V().addScaledVector(fwd, -input.mz).addScaledVector(right, input.mx);
+  if (mv.lengthSq() > 1) mv.normalize();
+
+  if (input.zip) { input.zip = false; webZip(); }
+  if (zipT > 0) zipT -= dt;
+
+  if (input.web && !swinging && zipT <= 0 && tryAttach()) {
+    swinging = true; ropeLen = pos.distanceTo(anchor);
+    if (onGround) { vel.y = 15; onGround = false; }
+  } else if (!input.web && swinging) {
+    swinging = false; vel.y += 9;
+    const h = vel.clone().setY(0); if (h.lengthSq() > 1) vel.addScaledVector(h.normalize(), 6);
+  }
+
+  if (onGround) {
+    const sp = input.sprint ? 26 : 12, k = Math.min(1, dt*12);
+    vel.x += (mv.x*sp - vel.x)*k; vel.z += (mv.z*sp - vel.z)*k;
+    if (input.jump) { vel.y = input.sprint ? 20 : 16; onGround = false; }
+  } else vel.addScaledVector(mv, (swinging ? 30 : 12) * dt);
+
+  if (zipT <= 0) vel.y += GRAV * dt;
+  if (touchingWall && input.mz < -0.3 && !swinging) vel.y = input.sprint ? 18 : 11;
+  vel.multiplyScalar(1 - 0.06*dt);
+  const prevY = pos.y;
+  pos.addScaledVector(vel, dt);
+
+  if (swinging) {
+    ropeLen = Math.max(8, ropeLen - dt*6);
+    const th = pos.clone().sub(anchor), d = th.length();
+    if (d > ropeLen) { th.divideScalar(d); pos.copy(anchor).addScaledVector(th, ropeLen);
+      const r = vel.dot(th); if (r > 0) vel.addScaledVector(th, -r); }
+  }
+
+  onGround = false; touchingWall = false;
+  const inCity = pos.x > XMIN-20 && pos.x < XMAX+20;
+  if (pos.y <= 0) {
+    if (vel.y < -45) health = Math.max(0.1, health - 0.15);
+    pos.y = 0; if (vel.y < 0) vel.y = 0; onGround = true;
+    if (!inCity) { pos.set(THREE.MathUtils.clamp(pos.x, XMIN, XMAX), 0, pos.z); vel.set(0,12,0); }
+  }
+  for (const b of buildings) {
+    if (pos.x > b.minX-RC && pos.x < b.maxX+RC && pos.z > b.minZ-RC && pos.z < b.maxZ+RC && pos.y < b.h+0.02 && pos.y + 1.8 > (b.base||0)) {
+      if (prevY >= b.h - 0.1) { pos.y = b.h; if (vel.y < 0) vel.y = 0; onGround = true; }
+      else {
+        const d = [pos.x-(b.minX-RC), (b.maxX+RC)-pos.x, pos.z-(b.minZ-RC), (b.maxZ+RC)-pos.z], m = Math.min(...d);
+        if (m===d[0]) { pos.x=b.minX-RC; vel.x=Math.min(vel.x,0); } else if (m===d[1]) { pos.x=b.maxX+RC; vel.x=Math.max(vel.x,0); }
+        else if (m===d[2]) { pos.z=b.minZ-RC; vel.z=Math.min(vel.z,0); } else { pos.z=b.maxZ+RC; vel.z=Math.max(vel.z,0); }
+        touchingWall = true; zipT = 0;
+      }
+    }
+  }
+  health = Math.min(1, health + dt*0.03);
+
+  hero.position.copy(pos);
+  const hs = Math.hypot(vel.x, vel.z);
+  const face = hs > 1 ? Math.atan2(vel.x, vel.z) : (mv.lengthSq() ? Math.atan2(mv.x, mv.z) : hero.rotation.y);
+  hero.rotation.y = angLerp(hero.rotation.y, face, 1 - Math.exp(-dt*10));
+  animateHero(dt, input.mx);
+
+  webLine.visible = swinging || zipT > 0;
+  if (webLine.visible) {
+    const hp = V(); rig.R.arm.hand.getWorldPosition(hp);
+    const p = webGeo.attributes.position; p.setXYZ(0, hp.x, hp.y, hp.z); p.setXYZ(1, anchor.x, anchor.y, anchor.z); p.needsUpdate = true;
+  }
+}
+
+function updateCamera(dt) {
+  const spd = vel.length();
+  const target = pos.clone().add(new THREE.Vector3(0, 1.7, 0));
+  const dist = 7 + Math.min(6, spd * 0.08);
+  const off = new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch), Math.sin(pitch), Math.cos(yaw)*Math.cos(pitch)).multiplyScalar(dist);
+  const want = target.clone().add(off);
+  // keep camera out of buildings
+  ray.set(target, off.clone().normalize()); ray.far = dist;
+  const hit = ray.intersectObjects(webTargets, false)[0];
+  if (hit) want.copy(target).addScaledVector(off.normalize(), Math.max(1.5, hit.distance - 0.6));
+  camera.position.lerp(want, 1 - Math.exp(-dt*12));
+  if (camera.position.y < 0.6) camera.position.y = 0.6;
+  camera.lookAt(target);
+  camera.fov += ((70 + Math.min(22, spd*0.3)) - camera.fov) * Math.min(1, dt*4);
+  camera.updateProjectionMatrix();
+  sky.position.copy(camera.position);
+  sun.position.copy(pos).add(new THREE.Vector3(-120, 160, 80)); sun.target.position.copy(pos);
+}
+
+/* =========================================================
+   MINIMAP + HUD
+   ========================================================= */
+const mapC = document.getElementById('map'), mg = mapC.getContext('2d');
+const MAPSCALE = 0.45;
+function drawMap() {
+  const W = 300, cx = W/2;
+  mg.setTransform(1,0,0,1,0,0);
+  mg.fillStyle = '#16364d'; // river / water
+  mg.fillRect(0,0,W,W);
+
+  mg.save();
+  mg.translate(cx, cx);
+  mg.rotate(yaw);
+  mg.scale(MAPSCALE, MAPSCALE);
+  mg.translate(-pos.x, -pos.z);
+
+  // Land (Manhattan island)
+  mg.fillStyle = '#26292e';
+  mg.fillRect(XMIN - 10, ZMIN - 10, (XMAX - XMIN) + 20, (ZMAX - ZMIN) + 20);
+
+  // Central Park
+  mg.fillStyle = '#2e5c2b';
+  mg.fillRect(PARK.minX, PARK.minZ, PARK.maxX - PARK.minX, PARK.maxZ - PARK.minZ);
+
+  // Building footprints
+  mg.fillStyle = '#3a3f47';
+  for (let i = 0; i < buildings.length; i++) {
+    const b = buildings[i];
+    mg.fillRect(b.minX, b.minZ, b.maxX - b.minX, b.maxZ - b.minZ);
+  }
+
+  // Empire State landmark marker
+  mg.fillStyle = '#ff3344';
+  mg.beginPath();
+  mg.arc(esX, esZ, 9, 0, Math.PI * 2);
+  mg.fill();
+
+  // Chrysler crown marker
+  mg.fillStyle = '#ffbb00';
+  mg.beginPath();
+  mg.arc(chX, chZ, 8, 0, Math.PI * 2);
+  mg.fill();
+
+  mg.restore();
+
+  // Player arrow at center (pointing UP, because map rotates with yaw)
+  mg.save();
+  mg.translate(cx, cx);
+  mg.fillStyle = '#ffffff';
+  mg.beginPath();
+  mg.moveTo(0, -10);
+  mg.lineTo(7, 8);
+  mg.lineTo(0, 4);
+  mg.lineTo(-7, 8);
+  mg.closePath();
+  mg.fill();
+  mg.strokeStyle = '#e11';
+  mg.lineWidth = 2.5;
+  mg.stroke();
+  mg.restore();
+}
+
+function updateCars(dt) {
+  for (let i = 0; i < cars.length; i++) {
+    const c = cars[i];
+    c.m.position.z += c.dir * c.sp * dt;
+    if (c.dir > 0 && c.m.position.z > ZMAX) c.m.position.z = ZMIN;
+    else if (c.dir < 0 && c.m.position.z < ZMIN) c.m.position.z = ZMAX;
+  }
+}
+
+const hpEl = document.querySelector('#hp i');
+const spdEl = document.getElementById('spd');
+const distEl = document.getElementById('district');
+const objEl = document.getElementById('obj');
+
+let mapTimer = 0;
+function updateHUD(dt) {
+  if (hpEl) hpEl.style.width = Math.round(health * 100) + '%';
+  if (spdEl) spdEl.textContent = Math.round(vel.length() * 3.6);
+  if (distEl) distEl.textContent = district(pos.z, pos.x);
+
+  if (Math.hypot(pos.x - esX, pos.z - esZ) < 30 && pos.y > esTop - 5) {
+    if (objEl) {
+      objEl.textContent = '★ EMPIRE STATE SPIRE REACHED!';
+      objEl.style.color = '#7cff4f';
+    }
+  }
+
+  mapTimer += dt;
+  if (mapTimer > 0.05) {
+    drawMap();
+    mapTimer = 0;
+  }
+}
+
+/* =========================================================
+   GAME START & SUIT SETUP
+   ========================================================= */
+buildHero(SUITS[suitKey]);
+
+const playBtn = document.getElementById('play');
+const menuDiv = document.getElementById('menu');
+const hudDiv = document.getElementById('hud');
+const touchDiv = document.getElementById('touch');
+
+playBtn.addEventListener('click', () => {
+  initAudio();
+  menuDiv.style.display = 'none';
+  hudDiv.style.display = 'block';
+  if (isTouch) touchDiv.style.display = 'block';
+
+  buildHero(SUITS[suitKey]);
+  document.getElementById('heroName').textContent = SUITS[suitKey].name;
+
+  playing = true;
+  if (!isTouch) {
+    renderer.domElement.requestPointerLock();
+  }
+});
+
+/* =========================================================
+   LOOP & RESIZE
+   ========================================================= */
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.033);
+  if (playing) {
+    update(dt / 2);
+    update(dt / 2);
+    updateCars(dt);
+    updateCamera(dt);
+    updateHUD(dt);
+  } else {
+    // Menu preview: rotate hero gently in place
+    hero.position.set(0, 0, 150);
+    hero.rotation.y += dt * 0.8;
+    camera.position.set(0, 1.8, 154);
+    camera.lookAt(0, 1.3, 150);
+  }
+  renderer.render(scene, camera);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
